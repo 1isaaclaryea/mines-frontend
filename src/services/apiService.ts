@@ -124,6 +124,49 @@ export function getStoredUser(): LoginResponse['user'] | null {
 }
 
 /**
+ * Decode JWT token and extract payload
+ */
+function decodeJWT(token: string): any {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if JWT token is expired
+ * Returns true if token is expired or invalid
+ */
+export function isTokenExpired(): boolean {
+  const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+  
+  if (!token) {
+    return true; // No token means expired
+  }
+  
+  const payload = decodeJWT(token);
+  
+  if (!payload || !payload.exp) {
+    return true; // Invalid token or no expiration
+  }
+  
+  // JWT exp is in seconds, Date.now() is in milliseconds
+  const currentTime = Date.now() / 1000;
+  
+  return payload.exp < currentTime;
+}
+
+/**
  * Check if user is authenticated
  * Matches Angular pattern - checks for 'token' key
  */

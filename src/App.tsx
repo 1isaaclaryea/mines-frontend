@@ -3,7 +3,8 @@ import { PublicClientApplication } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
 import { msalConfig } from './config/authConfig';
 import { LoginPage, UserRole } from './components/mining/LoginPage';
-import { isAuthenticated as checkAuth, getStoredUser, logout as apiLogout } from './services/apiService';
+import { isAuthenticated as checkAuth, getStoredUser, logout as apiLogout, isTokenExpired } from './services/apiService';
+import { toast } from 'sonner';
 import { SideDrawer } from './components/mining/SideDrawer';
 import { TimeRangeSelector } from './components/mining/TimeRangeSelector';
 import { KPICard } from './components/mining/KPICard';
@@ -90,7 +91,23 @@ function AppContent() {
 
   // Check for existing session on load (matching Angular pattern)
   useEffect(() => {
+    // Check if token exists and is not expired
     if (checkAuth()) {
+      if (isTokenExpired()) {
+        // Token is expired, clear authentication state
+        console.log('Token expired, clearing authentication');
+        localStorage.clear();
+        setIsAuthenticated(false);
+        
+        // Notify user that their session has expired
+        toast.error('Session Expired', {
+          description: 'Your session has expired. Please login again.',
+          duration: 5000,
+        });
+        return;
+      }
+      
+      // Token is valid, restore user session
       const user = getStoredUser();
       if (user) {
         setIsAuthenticated(true);
