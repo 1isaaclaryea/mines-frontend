@@ -292,3 +292,112 @@ export async function getDataEntries(section: string, date: Date): Promise<any> 
 
   return response.json();
 }
+
+/**
+ * Historian data interfaces
+ */
+export interface HistorianDataPoint {
+  tag?: string;
+  tagName?: string;
+  tagname?: string;
+  timestamp?: string;
+  time?: string;
+  value: number;
+}
+
+export interface HistorianResponse {
+  success?: boolean;
+  data: HistorianDataPoint[];
+  message?: string;
+}
+
+export interface DigitalHistorianResponse {
+  success: boolean;
+  tag: string;
+  value: number | null;
+  timestamp: string | null;
+  message?: string;
+}
+
+/**
+ * Format date to YYYY-MM-DD HH:MM:SS format for historian API
+ */
+function formatDateForHistorian(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Get analog historian data (for process parameters)
+ * Fetches raw data points for the specified time range
+ */
+export async function getAnalogHistorianData(
+  tags: string,
+  startTime: Date,
+  endTime: Date
+): Promise<HistorianResponse> {
+  const params = new URLSearchParams({
+    tags,
+    start_time: formatDateForHistorian(startTime),
+    end_time: formatDateForHistorian(endTime),
+  });
+
+  const response = await fetch(`${API_BASE_URL}/historian/data?${params}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    
+    if (response.status === 503) {
+      throw new Error('Historian server is not responding');
+    }
+    
+    throw new Error(errorData.message || `Failed to fetch historian data: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get digital historian data (for equipment status)
+ * Fetches latest digital value (1 or 0) for equipment
+ */
+export async function getDigitalHistorianData(tag: string): Promise<DigitalHistorianResponse> {
+  const params = new URLSearchParams({ tag });
+
+  const response = await fetch(`${API_BASE_URL}/historian/digital?${params}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    
+    if (response.status === 503) {
+      throw new Error('Historian server is not responding');
+    }
+    
+    throw new Error(errorData.message || `Failed to fetch digital historian data: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// Export getAuthHeaders for use in other components
+export { getAuthHeaders };

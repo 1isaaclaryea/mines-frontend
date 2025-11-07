@@ -14,7 +14,8 @@ interface Section {
   id: string;
   name: string;
   icon: React.ReactNode;
-  parameterCount: number;
+  processParameters: number;
+  criticalEquipment: number;
   status: 'optimal' | 'caution' | 'critical';
   description: string;
 }
@@ -24,7 +25,8 @@ const sections: Section[] = [
     id: 'milling',
     name: 'Milling',
     icon: <Hammer className="h-6 w-6" />,
-    parameterCount: 12,
+    processParameters: 5,
+    criticalEquipment: 10,
     status: 'optimal',
     description: 'Grinding & size reduction'
   },
@@ -32,7 +34,8 @@ const sections: Section[] = [
     id: 'flotation',
     name: 'Flotation',
     icon: <Waves className="h-6 w-6" />,
-    parameterCount: 8,
+    processParameters: 2,
+    criticalEquipment: 8,
     status: 'optimal',
     description: 'Mineral separation process'
   },
@@ -40,7 +43,8 @@ const sections: Section[] = [
     id: 'cil',
     name: 'CIL',
     icon: <Beaker className="h-6 w-6" />,
-    parameterCount: 15,
+    processParameters: 5,
+    criticalEquipment: 6,
     status: 'caution',
     description: 'Carbon-in-leach circuit'
   },
@@ -48,7 +52,8 @@ const sections: Section[] = [
     id: 'elution',
     name: 'Elution',
     icon: <Droplet className="h-6 w-6" />,
-    parameterCount: 6,
+    processParameters: 2,
+    criticalEquipment: 5,
     status: 'critical',
     description: 'Carbon stripping process'
   },
@@ -56,7 +61,8 @@ const sections: Section[] = [
     id: 'gravity-circuit',
     name: 'Gravity Circuit',
     icon: <Coins className="h-6 w-6" />,
-    parameterCount: 5,
+    processParameters: 1,
+    criticalEquipment: 2,
     status: 'optimal',
     description: 'Gravity concentration'
   },
@@ -64,7 +70,8 @@ const sections: Section[] = [
     id: 'crusher',
     name: 'Crusher',
     icon: <Mountain className="h-6 w-6" />,
-    parameterCount: 9,
+    processParameters: 1,
+    criticalEquipment: 5,
     status: 'optimal',
     description: 'Primary ore crushing'
   }
@@ -127,13 +134,23 @@ export function CriticalParameters({ onSectionClick }: CriticalParametersProps) 
                 <p className="text-sm text-muted-foreground">
                   {section.description}
                 </p>
-                <div className="flex items-center justify-between pt-2">
-                  <span className="text-xs text-muted-foreground">
-                    Parameters
-                  </span>
-                  <span className="text-lg font-bold text-primary">
-                    {section.parameterCount}
-                  </span>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">
+                      Process Parameters
+                    </span>
+                    <span className="text-lg font-bold text-primary">
+                      {section.processParameters}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground">
+                      Critical Equipment
+                    </span>
+                    <span className="text-lg font-bold text-primary">
+                      {section.criticalEquipment}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

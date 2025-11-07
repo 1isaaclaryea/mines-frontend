@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -19,8 +19,17 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Legend
+  Legend,
+  Brush
 } from 'recharts';
+import { 
+  getAnalogHistorianData, 
+  getDigitalHistorianData,
+  isAuthenticated,
+  type HistorianDataPoint,
+  type HistorianResponse,
+  type DigitalHistorianResponse
+} from '../../services/apiService';
 import { 
   Thermometer, 
   Droplets, 
@@ -41,6 +50,7 @@ import {
 interface Parameter {
   id: string;
   name: string;
+  tag: string;
   value: number;
   unit: string;
   target: number;
@@ -53,6 +63,7 @@ interface Parameter {
 interface Equipment {
   id: string;
   name: string;
+  tag: string;
   type: 'crusher' | 'conveyor' | 'separator' | 'pump' | 'generator';
   status: 'optimal' | 'caution' | 'critical' | 'offline';
   health: number;
@@ -63,96 +74,213 @@ interface Equipment {
   nextMaintenance: string;
 }
 
-const mockParameters: Parameter[] = [
-  {
-    id: 'cyanide-cil-1',
-    name: 'Cyanide Level - CIL Tank 1',
-    value: 2.8,
-    unit: 'ppm',
-    target: 3.0,
-    status: 'caution',
-    trend: 'down',
-    lastUpdated: '2 mins ago',
-    description: 'Sodium cyanide concentration in primary leaching circuit'
-  },
-  {
-    id: 'do-cil-1',
-    name: 'Dissolved Oxygen - CIL Tank 1',
-    value: 8.2,
-    unit: 'mg/L',
-    target: 8.0,
-    status: 'optimal',
-    trend: 'stable',
-    lastUpdated: '1 min ago',
-    description: 'Oxygen saturation for optimal cyanidation process'
-  },
-  {
-    id: 'ph-cil-2',
-    name: 'pH Level - CIL Tank 2',
-    value: 10.8,
-    unit: '',
-    target: 11.0,
-    status: 'caution',
-    trend: 'down',
-    lastUpdated: '3 mins ago',
-    description: 'Alkalinity level for cyanide stability'
-  },
-  {
-    id: 'temperature-elution',
-    name: 'Elution Strip Temperature',
-    value: 98.5,
-    unit: '°C',
-    target: 100.0,
-    status: 'optimal',
-    trend: 'up',
-    lastUpdated: '1 min ago',
-    description: 'Temperature for carbon stripping process'
-  },
-  {
-    id: 'pressure-oxygen',
-    name: 'Oxygen Injection Pressure',
-    value: 4.2,
-    unit: 'bar',
-    target: 4.5,
-    status: 'caution',
-    trend: 'down',
-    lastUpdated: '2 mins ago',
-    description: 'Pressure in oxygen distribution system'
-  },
-  {
-    id: 'flow-rate-cil',
-    name: 'CIL Circuit Flow Rate',
-    value: 245,
-    unit: 'L/min',
-    target: 250,
-    status: 'optimal',
-    trend: 'stable',
-    lastUpdated: '1 min ago',
-    description: 'Slurry flow through carbon-in-leach circuit'
-  },
-  {
-    id: 'carbon-loading',
-    name: 'Carbon Loading',
-    value: 3200,
-    unit: 'g/t',
-    target: 3500,
-    status: 'caution',
-    trend: 'up',
-    lastUpdated: '4 mins ago',
-    description: 'Gold loading on activated carbon'
-  },
-  {
-    id: 'lime-consumption',
-    name: 'Lime Consumption Rate',
-    value: 1.8,
-    unit: 'kg/t',
-    target: 2.0,
-    status: 'optimal',
-    trend: 'stable',
-    lastUpdated: '2 mins ago',
-    description: 'Lime usage for pH control'
-  }
-];
+// Section-specific parameter mappings
+const SECTION_PARAMETERS: Record<string, Parameter[]> = {
+  'cil': [
+    {
+      id: 'cn-level',
+      name: 'Cyanide Level - CIL Tank 1',
+      tag: 'FIX.CN_LEVEL.F_CV',
+      value: 0,
+      unit: 'ppm',
+      target: 3.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Sodium cyanide concentration in primary leaching circuit'
+    },
+    {
+      id: 'do-cil-1',
+      name: 'Dissolved Oxygen - CIL Tank 1',
+      tag: 'FIX.D0.F_CV',
+      value: 0,
+      unit: 'mg/L',
+      target: 8.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Oxygen saturation for optimal cyanidation process'
+    },
+    {
+      id: 'density',
+      name: 'Density',
+      tag: 'FIX.DENSITY.F_CV',
+      value: 0,
+      unit: 'g/cm³',
+      target: 1.5,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Slurry density measurement'
+    },
+    {
+      id: 'percentage-solids',
+      name: 'Percentage solids',
+      tag: 'FIX.PERCENTAGE_SOLIDS.F_CV',
+      value: 0,
+      unit: '%',
+      target: 45.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Solid content in slurry'
+    },
+    {
+      id: 'ph-level',
+      name: 'pH Level',
+      tag: 'FIX.PH_LEVEL.F_CV',
+      value: 0,
+      unit: '',
+      target: 11.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Alkalinity level for cyanide stability'
+    }
+  ],
+  'elution': [
+    {
+      id: 'elution-temperature',
+      name: 'Temperature',
+      tag: 'ELUTION.TEMPERATURE.F_CV',
+      value: 0,
+      unit: '°C',
+      target: 100.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Elution strip temperature'
+    },
+    {
+      id: 'elution-pressure',
+      name: 'Pressure',
+      tag: 'ELUTION.PRESSURE.F_CV',
+      value: 0,
+      unit: 'bar',
+      target: 4.5,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Elution system pressure'
+    }
+  ],
+  'flotation': [
+    {
+      id: 'flotation-density',
+      name: 'Density',
+      tag: 'FLOTATION.DENSITY.F_CV',
+      value: 0,
+      unit: 'g/cm³',
+      target: 1.3,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Flotation slurry density'
+    },
+    {
+      id: 'reagent-concentration',
+      name: 'Reagent Concentration',
+      tag: 'FLOTATION.REAGENT_CONC.F_CV',
+      value: 0,
+      unit: 'g/L',
+      target: 50.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Flotation reagent concentration'
+    }
+  ],
+  'gravity-circuit': [
+    {
+      id: 'gravity-amps',
+      name: 'Amps',
+      tag: 'GRAVITY.AMPS.F_CV',
+      value: 0,
+      unit: 'A',
+      target: 150.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Gravity circuit amperage'
+    }
+  ],
+  'milling': [
+    {
+      id: 'mill-throughput',
+      name: 'Throughput',
+      tag: 'MILLING.THROUGHPUT.F_CV',
+      value: 0,
+      unit: 't/h',
+      target: 250.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Mill throughput rate'
+    },
+    {
+      id: 'cyclone-pressure',
+      name: 'Cyclone Pressure',
+      tag: 'MILLING.CYCLONE_PRESSURE.F_CV',
+      value: 0,
+      unit: 'kPa',
+      target: 120.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Cyclone feed pressure'
+    },
+    {
+      id: 'mill-discharge-density',
+      name: 'Mill Discharge Density',
+      tag: 'MILLING.DISCHARGE_DENSITY.F_CV',
+      value: 0,
+      unit: 'g/cm³',
+      target: 1.8,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Mill discharge slurry density'
+    },
+    {
+      id: 'mill-weight',
+      name: 'Mill Weight',
+      tag: 'MILLING.MILL_WEIGHT.F_CV',
+      value: 0,
+      unit: 't',
+      target: 180.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'SAG mill load weight'
+    },
+    {
+      id: 'mill-power',
+      name: 'Mill Power',
+      tag: 'MILLING.MILL_POWER.F_CV',
+      value: 0,
+      unit: 'kW',
+      target: 3500.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'SAG mill power draw'
+    }
+  ],
+  'crusher': [
+    {
+      id: 'crusher-throughput',
+      name: 'Throughput',
+      tag: 'CRUSHER.THROUGHPUT.F_CV',
+      value: 0,
+      unit: 't/h',
+      target: 300.0,
+      status: 'optimal',
+      trend: 'stable',
+      lastUpdated: 'Loading...',
+      description: 'Crusher throughput rate'
+    }
+  ]
+};
 
 // Generate mock historical data for trend visualization
 const generateHistoricalData = (parameter: Parameter, hours: number = 24) => {
@@ -182,80 +310,476 @@ const generateHistoricalData = (parameter: Parameter, hours: number = 24) => {
   return data;
 };
 
-const mockCriticalEquipment: Equipment[] = [
-  {
-    id: 'gravity-conc-1',
-    name: 'Gravity Concentrator #1',
-    type: 'separator',
-    status: 'optimal',
-    health: 94,
-    temperature: 42,
-    powerUsage: 87,
-    efficiency: 96,
-    lastMaintenance: '2024-01-15',
-    nextMaintenance: '2024-02-15'
-  },
-  {
-    id: 'cil-agitator-3',
-    name: 'CIL Tank 3 Agitator',
-    type: 'pump',
-    status: 'caution',
-    health: 78,
-    temperature: 65,
-    powerUsage: 112,
-    efficiency: 82,
-    lastMaintenance: '2024-01-08',
-    nextMaintenance: '2024-02-08'
-  },
-  {
-    id: 'oxygen-plant',
-    name: 'Oxygen Generation Plant',
-    type: 'generator',
-    status: 'optimal',
-    health: 91,
-    temperature: 38,
-    powerUsage: 156,
-    efficiency: 93,
-    lastMaintenance: '2024-01-20',
-    nextMaintenance: '2024-02-20'
-  },
-  {
-    id: 'elution-column',
-    name: 'Elution Column System',
-    type: 'separator',
-    status: 'critical',
-    health: 65,
-    temperature: 88,
-    powerUsage: 95,
-    efficiency: 71,
-    lastMaintenance: '2024-01-05',
-    nextMaintenance: '2024-02-05'
-  },
-  {
-    id: 'carbon-screen',
-    name: 'Carbon Screening System',
-    type: 'separator',
-    status: 'caution',
-    health: 72,
-    temperature: 45,
-    powerUsage: 78,
-    efficiency: 77,
-    lastMaintenance: '2024-01-12',
-    nextMaintenance: '2024-02-12'
-  },
-  {
-    id: 'cyanide-dosing',
-    name: 'Cyanide Dosing Pump',
-    type: 'pump',
-    status: 'optimal',
-    health: 89,
-    temperature: 41,
-    powerUsage: 23,
-    efficiency: 94,
-    lastMaintenance: '2024-01-18',
-    nextMaintenance: '2024-02-18'
-  }
-];
+// Section-specific equipment mappings
+const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
+  'cil': [
+    {
+      id: 'cn-dosing-pump',
+      name: 'Cyanide Dosing Pump',
+      tag: 'FIX.CN_DOSING_PUMP.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 89,
+      temperature: 41,
+      powerUsage: 23,
+      efficiency: 94,
+      lastMaintenance: '2024-01-18',
+      nextMaintenance: '2024-02-18'
+    },
+    {
+      id: 'oxygen-plant',
+      name: 'Oxygen Generation Plant',
+      tag: 'FIX.PSA3.F_CV',
+      type: 'generator',
+      status: 'offline',
+      health: 91,
+      temperature: 38,
+      powerUsage: 156,
+      efficiency: 93,
+      lastMaintenance: '2024-01-20',
+      nextMaintenance: '2024-02-20'
+    },
+    {
+      id: 'recovery-pump',
+      name: 'Recovery Pump',
+      tag: 'FIX.RECOVERY_PUMP.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 85,
+      temperature: 50,
+      powerUsage: 75,
+      efficiency: 88,
+      lastMaintenance: '2024-01-22',
+      nextMaintenance: '2024-02-22'
+    },
+    {
+      id: 'carbon-screen',
+      name: 'Carbon Screening System',
+      tag: 'FIX.RECOVERY_SCREEN.F_CV',
+      type: 'separator',
+      status: 'offline',
+      health: 72,
+      temperature: 45,
+      powerUsage: 78,
+      efficiency: 77,
+      lastMaintenance: '2024-01-12',
+      nextMaintenance: '2024-02-12'
+    },
+    {
+      id: 'cil-agitator-3',
+      name: 'CIL Tank 3 Agitator',
+      tag: 'FIX.TANK1_AGITATOR.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 78,
+      temperature: 65,
+      powerUsage: 112,
+      efficiency: 82,
+      lastMaintenance: '2024-01-18',
+      nextMaintenance: '2024-02-18'
+    }
+  ],
+  'elution': [
+    {
+      id: 'thermomat',
+      name: 'Thermomat',
+      tag: 'ELUTION.THERMOMAT.F_CV',
+      type: 'generator',
+      status: 'offline',
+      health: 88,
+      temperature: 95,
+      powerUsage: 120,
+      efficiency: 91,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'recovery-screen',
+      name: 'Recovery Screen',
+      tag: 'ELUTION.RECOVERY_SCREEN.F_CV',
+      type: 'separator',
+      status: 'offline',
+      health: 85,
+      temperature: 42,
+      powerUsage: 65,
+      efficiency: 88,
+      lastMaintenance: '2024-01-15',
+      nextMaintenance: '2024-02-15'
+    },
+    {
+      id: 'strip-solution-pump',
+      name: 'Strip Solution Pump',
+      tag: 'ELUTION.STRIP_PUMP.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 90,
+      temperature: 38,
+      powerUsage: 45,
+      efficiency: 93,
+      lastMaintenance: '2024-01-12',
+      nextMaintenance: '2024-02-12'
+    },
+    {
+      id: 'kiln',
+      name: 'Kiln',
+      tag: 'ELUTION.KILN.F_CV',
+      type: 'generator',
+      status: 'offline',
+      health: 82,
+      temperature: 850,
+      powerUsage: 450,
+      efficiency: 85,
+      lastMaintenance: '2024-01-05',
+      nextMaintenance: '2024-02-05'
+    },
+    {
+      id: 'reagent-water-pump',
+      name: 'Reagent Water Pump',
+      tag: 'ELUTION.REAGENT_PUMP.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 91,
+      temperature: 35,
+      powerUsage: 30,
+      efficiency: 94,
+      lastMaintenance: '2024-01-20',
+      nextMaintenance: '2024-02-20'
+    }
+  ],
+  'milling': [
+    {
+      id: 'discharge-pump-pp12',
+      name: 'Discharge Pump PP12',
+      tag: 'MILLING.PP12.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 87,
+      temperature: 55,
+      powerUsage: 85,
+      efficiency: 89,
+      lastMaintenance: '2024-01-08',
+      nextMaintenance: '2024-02-08'
+    },
+    {
+      id: 'discharge-pump-pp14',
+      name: 'Discharge Pump PP14',
+      tag: 'MILLING.PP14.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 86,
+      temperature: 56,
+      powerUsage: 87,
+      efficiency: 88,
+      lastMaintenance: '2024-01-08',
+      nextMaintenance: '2024-02-08'
+    },
+    {
+      id: 'discharge-screen-6',
+      name: 'Discharge Screen 6',
+      tag: 'MILLING.SCREEN_6.F_CV',
+      type: 'separator',
+      status: 'offline',
+      health: 83,
+      temperature: 48,
+      powerUsage: 72,
+      efficiency: 86,
+      lastMaintenance: '2024-01-14',
+      nextMaintenance: '2024-02-14'
+    },
+    {
+      id: 'gravity-screen-33',
+      name: 'Gravity Screen 33',
+      tag: 'MILLING.GRAV_SCREEN_33.F_CV',
+      type: 'separator',
+      status: 'offline',
+      health: 84,
+      temperature: 45,
+      powerUsage: 68,
+      efficiency: 87,
+      lastMaintenance: '2024-01-16',
+      nextMaintenance: '2024-02-16'
+    },
+    {
+      id: 'gravity-screen-34',
+      name: 'Gravity Screen 34',
+      tag: 'MILLING.GRAV_SCREEN_34.F_CV',
+      type: 'separator',
+      status: 'offline',
+      health: 85,
+      temperature: 44,
+      powerUsage: 67,
+      efficiency: 88,
+      lastMaintenance: '2024-01-16',
+      nextMaintenance: '2024-02-16'
+    },
+    {
+      id: 'sag-mill',
+      name: 'SAG Mill',
+      tag: 'MILLING.SAG_MILL.F_CV',
+      type: 'crusher',
+      status: 'offline',
+      health: 78,
+      temperature: 75,
+      powerUsage: 3500,
+      efficiency: 82,
+      lastMaintenance: '2024-01-01',
+      nextMaintenance: '2024-02-01'
+    },
+    {
+      id: 'cv-015',
+      name: 'CV-015',
+      tag: 'MILLING.CV_015.F_CV',
+      type: 'conveyor',
+      status: 'offline',
+      health: 90,
+      temperature: 42,
+      powerUsage: 55,
+      efficiency: 92,
+      lastMaintenance: '2024-01-18',
+      nextMaintenance: '2024-02-18'
+    },
+    {
+      id: 'cv-022',
+      name: 'CV-022',
+      tag: 'MILLING.CV_022.F_CV',
+      type: 'conveyor',
+      status: 'offline',
+      health: 89,
+      temperature: 43,
+      powerUsage: 56,
+      efficiency: 91,
+      lastMaintenance: '2024-01-18',
+      nextMaintenance: '2024-02-18'
+    },
+    {
+      id: 'cv-023',
+      name: 'CV-023',
+      tag: 'MILLING.CV_023.F_CV',
+      type: 'conveyor',
+      status: 'offline',
+      health: 88,
+      temperature: 44,
+      powerUsage: 57,
+      efficiency: 90,
+      lastMaintenance: '2024-01-18',
+      nextMaintenance: '2024-02-18'
+    },
+    {
+      id: 'raw-water-pump',
+      name: 'Raw Water Pump',
+      tag: 'MILLING.RAW_WATER_PUMP.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 92,
+      temperature: 38,
+      powerUsage: 75,
+      efficiency: 94,
+      lastMaintenance: '2024-01-22',
+      nextMaintenance: '2024-02-22'
+    }
+  ],
+  'gravity-circuit': [
+    {
+      id: 'knelson-1',
+      name: 'Knelson 1',
+      tag: 'GRAVITY.KNELSON_1.F_CV',
+      type: 'separator',
+      status: 'offline',
+      health: 86,
+      temperature: 48,
+      powerUsage: 95,
+      efficiency: 89,
+      lastMaintenance: '2024-01-12',
+      nextMaintenance: '2024-02-12'
+    },
+    {
+      id: 'knelson-2',
+      name: 'Knelson 2',
+      tag: 'GRAVITY.KNELSON_2.F_CV',
+      type: 'separator',
+      status: 'offline',
+      health: 87,
+      temperature: 47,
+      powerUsage: 94,
+      efficiency: 90,
+      lastMaintenance: '2024-01-12',
+      nextMaintenance: '2024-02-12'
+    }
+  ],
+  'crusher': [
+    {
+      id: 'crusher',
+      name: 'Crusher',
+      tag: 'CRUSHER.MAIN.F_CV',
+      type: 'crusher',
+      status: 'offline',
+      health: 80,
+      temperature: 68,
+      powerUsage: 850,
+      efficiency: 83,
+      lastMaintenance: '2024-01-05',
+      nextMaintenance: '2024-02-05'
+    },
+    {
+      id: 'feeder-06',
+      name: 'Feeder 06',
+      tag: 'CRUSHER.FEEDER_06.F_CV',
+      type: 'conveyor',
+      status: 'offline',
+      health: 88,
+      temperature: 42,
+      powerUsage: 45,
+      efficiency: 91,
+      lastMaintenance: '2024-01-15',
+      nextMaintenance: '2024-02-15'
+    },
+    {
+      id: 'cv-010',
+      name: 'CV-010',
+      tag: 'CRUSHER.CV_010.F_CV',
+      type: 'conveyor',
+      status: 'offline',
+      health: 89,
+      temperature: 41,
+      powerUsage: 52,
+      efficiency: 92,
+      lastMaintenance: '2024-01-16',
+      nextMaintenance: '2024-02-16'
+    },
+    {
+      id: 'cv-501',
+      name: 'CV-501',
+      tag: 'CRUSHER.CV_501.F_CV',
+      type: 'conveyor',
+      status: 'offline',
+      health: 90,
+      temperature: 40,
+      powerUsage: 50,
+      efficiency: 93,
+      lastMaintenance: '2024-01-16',
+      nextMaintenance: '2024-02-16'
+    },
+    {
+      id: 'oxide-apron-feeder',
+      name: 'Oxide Apron Feeder',
+      tag: 'CRUSHER.OXIDE_FEEDER.F_CV',
+      type: 'conveyor',
+      status: 'offline',
+      health: 85,
+      temperature: 44,
+      powerUsage: 62,
+      efficiency: 88,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    }
+  ],
+  'flotation': [
+    {
+      id: 'flotation-cell-1',
+      name: 'Flotation Cell Motor 1',
+      tag: 'FLOTATION.CELL_1.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 87,
+      temperature: 52,
+      powerUsage: 125,
+      efficiency: 89,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'flotation-cell-2',
+      name: 'Flotation Cell Motor 2',
+      tag: 'FLOTATION.CELL_2.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 88,
+      temperature: 51,
+      powerUsage: 123,
+      efficiency: 90,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'flotation-cell-3',
+      name: 'Flotation Cell Motor 3',
+      tag: 'FLOTATION.CELL_3.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 86,
+      temperature: 53,
+      powerUsage: 126,
+      efficiency: 88,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'flotation-cell-4',
+      name: 'Flotation Cell Motor 4',
+      tag: 'FLOTATION.CELL_4.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 87,
+      temperature: 52,
+      powerUsage: 124,
+      efficiency: 89,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'flotation-cell-5',
+      name: 'Flotation Cell Motor 5',
+      tag: 'FLOTATION.CELL_5.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 85,
+      temperature: 54,
+      powerUsage: 127,
+      efficiency: 87,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'flotation-cell-6',
+      name: 'Flotation Cell Motor 6',
+      tag: 'FLOTATION.CELL_6.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 88,
+      temperature: 51,
+      powerUsage: 122,
+      efficiency: 90,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'flotation-cell-7',
+      name: 'Flotation Cell Motor 7',
+      tag: 'FLOTATION.CELL_7.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 86,
+      temperature: 53,
+      powerUsage: 125,
+      efficiency: 88,
+      lastMaintenance: '2024-01-10',
+      nextMaintenance: '2024-02-10'
+    },
+    {
+      id: 'flotation-tailings-motor',
+      name: 'Flotation Tailings Motor',
+      tag: 'FLOTATION.TAILINGS_MOTOR.F_CV',
+      type: 'pump',
+      status: 'offline',
+      health: 84,
+      temperature: 55,
+      powerUsage: 135,
+      efficiency: 86,
+      lastMaintenance: '2024-01-08',
+      nextMaintenance: '2024-02-08'
+    }
+  ]
+};
 
 interface ProcessParametersPanelProps {
   section?: string;
@@ -267,6 +791,229 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<'all' | 'critical' | 'caution' | 'optimal'>('all');
   const [selectedParameter, setSelectedParameter] = useState<Parameter | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [historianChartData, setHistorianChartData] = useState<any[]>([]);
+  const [isLoadingChart, setIsLoadingChart] = useState(false);
+  const [chartError, setChartError] = useState<string | null>(null);
+
+  // Get section-specific parameters and equipment
+  const sectionKey = section || 'cil'; // Default to CIL if no section specified
+  const sectionParams = SECTION_PARAMETERS[sectionKey] || SECTION_PARAMETERS['cil'];
+  const sectionEquipment = SECTION_EQUIPMENT[sectionKey] || SECTION_EQUIPMENT['cil'];
+  
+  const [parameters, setParameters] = useState<Parameter[]>(sectionParams);
+  const [equipment, setEquipment] = useState<Equipment[]>(sectionEquipment);
+
+  // Update parameters and equipment when section changes
+  useEffect(() => {
+    const newParams = SECTION_PARAMETERS[sectionKey] || SECTION_PARAMETERS['cil'];
+    const newEquipment = SECTION_EQUIPMENT[sectionKey] || SECTION_EQUIPMENT['cil'];
+    setParameters(newParams);
+    setEquipment(newEquipment);
+  }, [section, sectionKey]);
+
+  // Fetch latest analog values for parameters (current values)
+  useEffect(() => {
+    const fetchParameterValues = async () => {
+      const currentSectionParams = SECTION_PARAMETERS[sectionKey] || SECTION_PARAMETERS['cil'];
+      if (!currentSectionParams || currentSectionParams.length === 0) return;
+      
+      // Check if user is authenticated before making API calls
+      if (!isAuthenticated()) {
+        console.warn('User not authenticated - skipping parameter values fetch');
+        setParameters(currentSectionParams);
+        return;
+      }
+      
+      try {
+        const tags = currentSectionParams.map((p: Parameter) => p.tag).join(',');
+        const endTime = new Date();
+        const startTime = new Date(endTime.getTime() - 5 * 60 * 1000); // Last 5 minutes
+        
+        console.log('Fetching analog data for tags:', tags);
+        const response = await getAnalogHistorianData(tags, startTime, endTime);
+        console.log('Analog data response:', response);
+        console.log('First data item sample:', response.data?.[0]);
+        
+        if (response.data && response.data.length > 0) {
+          const updatedParams = currentSectionParams.map((param: Parameter) => {
+            // Find latest value for this tag
+            const tagData = response.data.filter(d => 
+              (d.tag || d.tagName || d.tagname) === param.tag
+            ).sort((a, b) => {
+              const timeA = new Date(a.timestamp || a.time || 0).getTime();
+              const timeB = new Date(b.timestamp || b.time || 0).getTime();
+              return timeB - timeA;
+            });
+            
+            console.log(`Tag ${param.tag} data:`, tagData);
+            
+            if (tagData.length > 0) {
+              const latest = tagData[0];
+              const value = latest.value;
+              const target = param.target;
+              const deviation = Math.abs(value - target) / target;
+              
+              let status: 'optimal' | 'caution' | 'critical';
+              if (deviation < 0.1) status = 'optimal';
+              else if (deviation < 0.2) status = 'caution';
+              else status = 'critical';
+              
+              let trend: 'up' | 'down' | 'stable';
+              if (value > target * 1.05) trend = 'up';
+              else if (value < target * 0.95) trend = 'down';
+              else trend = 'stable';
+              
+              const timestamp = new Date(latest.timestamp || latest.time || new Date());
+              const formattedTime = timestamp.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              
+              return {
+                ...param,
+                value: parseFloat(value.toFixed(2)),
+                status,
+                trend,
+                lastUpdated: formattedTime
+              };
+            }
+            
+            return param;
+          });
+          
+          setParameters(updatedParams);
+        } else {
+          console.warn('No analog data received or empty data array');
+          // Set parameters with default values to clear "Loading..." state
+          setParameters(currentSectionParams);
+        }
+      } catch (error) {
+        console.error('Error fetching parameter values:', error);
+        // Set parameters with default values even on error
+        setParameters(currentSectionParams);
+      }
+    };
+
+    fetchParameterValues();
+    const interval = setInterval(fetchParameterValues, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [sectionKey]);
+
+  // Fetch digital values for equipment status
+  useEffect(() => {
+    const fetchEquipmentStatus = async () => {
+      const currentSectionEquipment = SECTION_EQUIPMENT[sectionKey] || SECTION_EQUIPMENT['cil'];
+      if (!currentSectionEquipment || currentSectionEquipment.length === 0) return;
+      
+      // Check if user is authenticated before making API calls
+      if (!isAuthenticated()) {
+        console.warn('User not authenticated - skipping equipment status fetch');
+        setEquipment(currentSectionEquipment);
+        return;
+      }
+      
+      try {
+        const updatedEquipment = await Promise.all(
+          currentSectionEquipment.map(async (eq: Equipment) => {
+            try {
+              const response = await getDigitalHistorianData(eq.tag);
+              
+              if (response.success && response.value !== null) {
+                const isRunning = response.value === 1;
+                return {
+                  ...eq,
+                  status: isRunning ? 'optimal' as const : 'offline' as const
+                };
+              }
+              
+              return eq;
+            } catch (error) {
+              // Handle authentication errors gracefully
+              if (error instanceof Error && error.message === 'Authentication required') {
+                console.warn(`Authentication required for ${eq.tag} - using default status`);
+              } else {
+                console.error(`Error fetching status for ${eq.tag}:`, error);
+              }
+              return eq;
+            }
+          })
+        );
+        
+        setEquipment(updatedEquipment);
+      } catch (error) {
+        console.error('Error fetching equipment status:', error);
+      }
+    };
+
+    fetchEquipmentStatus();
+    const interval = setInterval(fetchEquipmentStatus, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [sectionKey]);
+
+  // Fetch historian data for chart when parameter is selected
+  useEffect(() => {
+    if (!selectedParameter || !isDialogOpen) return;
+
+    const fetchChartData = async () => {
+      setIsLoadingChart(true);
+      setChartError(null);
+      
+      // Check if user is authenticated before making API calls
+      if (!isAuthenticated()) {
+        console.warn('User not authenticated - using mock data for chart');
+        setChartError('Please log in to view real-time data');
+        setHistorianChartData(generateHistoricalData(selectedParameter));
+        setIsLoadingChart(false);
+        return;
+      }
+      
+      try {
+        // Get data from 00:00 today to current time
+        const now = new Date();
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const response = await getAnalogHistorianData(
+          selectedParameter.tag,
+          startOfDay,
+          now
+        );
+        
+        if (response.data && response.data.length > 0) {
+          // Transform data for chart
+          const chartData = response.data.map(point => {
+            const timestamp = new Date(point.timestamp || point.time || new Date());
+            return {
+              time: timestamp.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              }),
+              value: point.value,
+              target: selectedParameter.target,
+              timestamp: timestamp.getTime()
+            };
+          }).sort((a, b) => a.timestamp - b.timestamp);
+          
+          setHistorianChartData(chartData);
+        } else {
+          setHistorianChartData(generateHistoricalData(selectedParameter));
+        }
+      } catch (error) {
+        console.error('Error fetching chart data:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
+        setChartError(errorMessage === 'Authentication required' 
+          ? 'Please log in to view real-time data' 
+          : errorMessage);
+        setHistorianChartData(generateHistoricalData(selectedParameter));
+      } finally {
+        setIsLoadingChart(false);
+      }
+    };
+
+    fetchChartData();
+  }, [selectedParameter, isDialogOpen]);
 
   const handleParameterClick = (parameter: Parameter) => {
     setSelectedParameter(parameter);
@@ -319,25 +1066,25 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   };
 
   const filteredParameters = selectedFilter === 'all' 
-    ? mockParameters 
-    : mockParameters.filter(param => param.status === selectedFilter);
+    ? parameters 
+    : parameters.filter((param: Parameter) => param.status === selectedFilter);
 
   const filteredEquipment = selectedEquipmentFilter === 'all'
-    ? mockCriticalEquipment
-    : mockCriticalEquipment.filter(eq => eq.status === selectedEquipmentFilter);
+    ? equipment
+    : equipment.filter((eq: Equipment) => eq.status === selectedEquipmentFilter);
 
   const parameterCounts = {
-    total: mockParameters.length,
-    critical: mockParameters.filter(p => p.status === 'critical').length,
-    caution: mockParameters.filter(p => p.status === 'caution').length,
-    optimal: mockParameters.filter(p => p.status === 'optimal').length
+    total: parameters.length,
+    critical: parameters.filter((p: Parameter) => p.status === 'critical').length,
+    caution: parameters.filter((p: Parameter) => p.status === 'caution').length,
+    optimal: parameters.filter((p: Parameter) => p.status === 'optimal').length
   };
 
   const equipmentCounts = {
-    total: mockCriticalEquipment.length,
-    critical: mockCriticalEquipment.filter(e => e.status === 'critical').length,
-    caution: mockCriticalEquipment.filter(e => e.status === 'caution').length,
-    optimal: mockCriticalEquipment.filter(e => e.status === 'optimal').length
+    total: equipment.length,
+    critical: equipment.filter((e: Equipment) => e.status === 'critical').length,
+    caution: equipment.filter((e: Equipment) => e.status === 'caution').length,
+    optimal: equipment.filter((e: Equipment) => e.status === 'optimal').length
   };
 
   const getSectionName = (sectionId?: string) => {
@@ -571,58 +1318,100 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
           
           {selectedParameter && (
             <div className="space-y-3 mt-2">
-              {/* Trend Chart - Made more prominent and wider than taller */}
+              {/* Trend Chart with Live Data */}
               <div>
-                <h3 className="text-sm sm:text-base font-semibold mb-2">24-Hour Trend</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart
-                    data={generateHistoricalData(selectedParameter)}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="time" 
-                      className="text-xs"
-                      tick={{ fill: 'currentColor' }}
-                    />
-                    <YAxis 
-                      className="text-xs"
-                      tick={{ fill: 'currentColor' }}
-                      label={{ 
-                        value: selectedParameter.unit, 
-                        angle: -90, 
-                        position: 'insideLeft',
-                        style: { textAnchor: 'middle' }
-                      }}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px'
-                      }}
-                      labelStyle={{ color: 'hsl(var(--foreground))' }}
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="target" 
-                      stroke="#3b82f6" 
-                      strokeDasharray="5 5"
-                      name="Target"
-                      dot={false}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      name="Actual Value"
-                      dot={{ fill: '#10b981', r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm sm:text-base font-semibold">Today's Trend (00:00 - Now)</h3>
+                  {historianChartData.length > 0 && !chartError && (
+                    <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500">
+                      Live Data
+                    </Badge>
+                  )}
+                  {chartError && (
+                    <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-500">
+                      Mock Data
+                    </Badge>
+                  )}
+                </div>
+                
+                {isLoadingChart && (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                    <div className="text-center">
+                      <Activity className="h-8 w-8 animate-pulse mx-auto mb-2" />
+                      <p className="text-sm">Loading historian data...</p>
+                    </div>
+                  </div>
+                )}
+                
+                {chartError && !isLoadingChart && (
+                  <div className="flex items-center justify-center h-[60px] text-muted-foreground">
+                    <div className="text-center">
+                      <AlertTriangle className="h-6 w-6 text-yellow-400 mx-auto mb-1" />
+                      <p className="text-xs">{chartError} - Showing mock data</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!isLoadingChart && (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart
+                      data={historianChartData.length > 0 ? historianChartData : generateHistoricalData(selectedParameter)}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="time" 
+                        className="text-xs"
+                        tick={{ fill: 'currentColor' }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis 
+                        className="text-xs"
+                        tick={{ fill: 'currentColor' }}
+                        label={{ 
+                          value: selectedParameter.unit, 
+                          angle: -90, 
+                          position: 'insideLeft',
+                          style: { textAnchor: 'middle' }
+                        }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'hsl(var(--background))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px'
+                        }}
+                        labelStyle={{ color: 'hsl(var(--foreground))' }}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="target" 
+                        stroke="#3b82f6" 
+                        strokeDasharray="5 5"
+                        name="Target"
+                        dot={false}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="value" 
+                        stroke="#10b981" 
+                        strokeWidth={2}
+                        name="Actual Value"
+                        dot={{ fill: '#10b981', r: 2 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Brush 
+                        dataKey="time" 
+                        height={30} 
+                        stroke="#8884d8"
+                        fill="hsl(var(--muted))"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
 
               <Separator />
