@@ -23,6 +23,8 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { mockKPIs, mockAlerts, mockEquipment, mockProductionData } from './mockData';
+import { downloadReportTemplate, downloadPopulatedReport } from '../../utils/excelTemplates';
+import { generateProdStatsPDF } from '../../utils/pdfGenerator';
 
 interface ReportConfig {
   title: string;
@@ -129,6 +131,27 @@ export function ReportGenerationPanel({ onBack }: ReportGenerationPanelProps = {
       toast.info(steps[i]);
     }
 
+    // Generate report based on format
+    if (reportConfig.format === 'excel') {
+      // Download Excel file from public folder
+      const link = document.createElement('a');
+      link.href = '/Production Update November 25.xlsx';
+      link.download = 'Production Update November 25.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else if (reportConfig.format === 'pdf') {
+      // Generate PDF from Prod Stats sheet
+      try {
+        await generateProdStatsPDF(reportConfig);
+      } catch (error: any) {
+        setIsGenerating(false);
+        setGenerationProgress(0);
+        toast.error(`Failed to generate PDF: ${error.message}`);
+        return;
+      }
+    }
+
     setIsGenerating(false);
     setGenerationProgress(0);
     toast.success(`${reportConfig.format.toUpperCase()} report generated successfully!`);
@@ -175,7 +198,18 @@ export function ReportGenerationPanel({ onBack }: ReportGenerationPanelProps = {
             Create comprehensive reports from your metallurgical operations data
           </p>
         </div>
-
+        
+        <Button
+          onClick={() => {
+            downloadReportTemplate();
+            toast.success('Excel template downloaded');
+          }}
+          variant="outline"
+          className="flex items-center space-x-2"
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          <span>Download Template</span>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

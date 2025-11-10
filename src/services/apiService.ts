@@ -442,5 +442,96 @@ export async function getDigitalHistorianData(tag: string): Promise<DigitalHisto
   return response.json();
 }
 
+/**
+ * Process Parameter Target interfaces
+ */
+export interface ProcessParameterTarget {
+  parameterId: string;
+  parameterName: string;
+  targetValue: number;
+  unit: string;
+  updatedBy: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface GetTargetsResponse {
+  success: boolean;
+  targets: ProcessParameterTarget[];
+  message?: string;
+}
+
+export interface UpdateTargetsRequest {
+  targets: {
+    parameterId: string;
+    targetValue: number;
+  }[];
+}
+
+export interface UpdateTargetsResponse {
+  success: boolean;
+  message: string;
+  updatedCount: number;
+  targets: {
+    parameterId: string;
+    targetValue: number;
+    updatedAt: string;
+  }[];
+}
+
+/**
+ * GET /api/process-parameters/targets
+ * Retrieve all process parameter targets
+ */
+export async function getProcessParameterTargets(): Promise<GetTargetsResponse> {
+  const response = await fetch(`${API_BASE_URL}/process-parameters/targets`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    
+    throw new Error(errorData.message || `Failed to fetch parameter targets: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * POST /api/process-parameters/targets
+ * Update process parameter targets (bulk update)
+ * Requires supervisor role
+ */
+export async function updateProcessParameterTargets(
+  request: UpdateTargetsRequest
+): Promise<UpdateTargetsResponse> {
+  const response = await fetch(`${API_BASE_URL}/process-parameters/targets`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    
+    if (response.status === 403) {
+      throw new Error('Insufficient permissions. Supervisor role required.');
+    }
+    
+    throw new Error(errorData.message || `Failed to update parameter targets: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
 // Export getAuthHeaders for use in other components
 export { getAuthHeaders };

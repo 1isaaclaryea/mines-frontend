@@ -12,6 +12,16 @@ import {
   DialogTitle 
 } from '../ui/dialog';
 import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '../ui/table';
+import { Input } from '../ui/input';
+import { toast } from 'sonner';
+import { 
   LineChart, 
   Line, 
   XAxis, 
@@ -26,9 +36,12 @@ import {
   getAnalogHistorianData, 
   getDigitalHistorianData,
   isAuthenticated,
+  getProcessParameterTargets,
+  updateProcessParameterTargets,
   type HistorianDataPoint,
   type HistorianResponse,
-  type DigitalHistorianResponse
+  type DigitalHistorianResponse,
+  type ProcessParameterTarget
 } from '../../services/apiService';
 import { 
   Thermometer, 
@@ -44,7 +57,12 @@ import {
   Settings,
   Wrench,
   Filter,
-  ArrowLeft
+  ArrowLeft,
+  Edit,
+  Save,
+  X as XIcon,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface Parameter {
@@ -794,6 +812,15 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   const [historianChartData, setHistorianChartData] = useState<any[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(false);
   const [chartError, setChartError] = useState<string | null>(null);
+  
+  // Update Targets dialog state
+  const [isUpdateTargetsOpen, setIsUpdateTargetsOpen] = useState(false);
+  const [targetsData, setTargetsData] = useState<ProcessParameterTarget[]>([]);
+  const [editedTargets, setEditedTargets] = useState<Record<string, number>>({});
+  const [isLoadingTargets, setIsLoadingTargets] = useState(false);
+  const [isSavingTargets, setIsSavingTargets] = useState(false);
+  const [currentTargetPage, setCurrentTargetPage] = useState(1);
+  const targetsPerPage = 5;
 
   // Get section-specific parameters and equipment
   const sectionKey = section || 'cil'; // Default to CIL if no section specified
@@ -1103,7 +1130,7 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
+        <div className="flex-1">
           <div className="flex items-center space-x-3 mb-2">
             {onBack && (
               <Button
@@ -1123,6 +1150,16 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
             Real-time monitoring of metallurgical process parameters and critical equipment
           </p>
         </div>
+        <Button
+          onClick={() => {
+            setIsUpdateTargetsOpen(true);
+            fetchTargets();
+          }}
+          className="ml-4"
+        >
+          <Edit className="h-4 w-4 mr-2" />
+          Update Targets
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -1270,7 +1307,7 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
               return (
                 <div
                   key={equipment.id}
-                  className={`p-3 sm:p-4 rounded-lg border-l-4 ${isRunning ? 'border-l-green-500 bg-green-50/5' : 'border-l-gray-500 bg-gray-50/5'}`}
+                  className={`p-3 sm:p-4 rounded-lg border-l-4 ${isRunning ? 'border-l-green-500 bg-green-50/5' : 'border-l-red-500 bg-red-50/5'}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -1286,10 +1323,10 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
                       {isRunning ? (
                         <CheckCircle className="h-5 w-5 text-green-400" />
                       ) : (
-                        <XCircle className="h-5 w-5 text-gray-400" />
+                        <XCircle className="h-5 w-5 text-red-400" />
                       )}
                       <Badge 
-                        variant={isRunning ? 'default' : 'secondary'}
+                        variant={isRunning ? 'default' : 'destructive'}
                         className="text-xs whitespace-nowrap"
                       >
                         {isRunning ? 'Running' : 'Offline'}
@@ -1461,6 +1498,208 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Update Targets Dialog */}
+      <Dialog open={isUpdateTargetsOpen} onOpenChange={setIsUpdateTargetsOpen}>
+        <DialogContent className="max-w-4xl h-[550px] p-3 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle className="flex items-center space-x-2">
+              <Edit className="h-5 w-5" />
+              <span>Update Process Parameter Targets</span>
+            </DialogTitle>
+            <DialogDescription>
+              Edit target values for process parameters. Changes will be saved when you click Save.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingTargets ? (
+            <div className="flex items-center justify-center py-8">
+              <Activity className="h-8 w-8 animate-pulse" />
+              <span className="ml-2">Loading targets...</span>
+            </div>
+          ) : targetsData.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+              <p>No targets found</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 px-6">
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader className="bg-background border-b">
+                      <TableRow>
+                        <TableHead className="min-w-[250px]">Parameter Name</TableHead>
+                        <TableHead className="w-[180px]">Target Value</TableHead>
+                        <TableHead className="w-[150px]">Updated By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const totalPages = Math.ceil(targetsData.length / targetsPerPage);
+                        const startIndex = (currentTargetPage - 1) * targetsPerPage;
+                        const endIndex = startIndex + targetsPerPage;
+                        const paginatedTargets = targetsData.slice(startIndex, endIndex);
+                        
+                        return paginatedTargets.map((target) => {
+                          const currentValue = editedTargets[target.parameterId] ?? target.targetValue;
+                          return (
+                            <TableRow key={target.parameterId}>
+                              <TableCell className="font-medium whitespace-normal">
+                                {target.parameterName || target.parameterId}
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={currentValue}
+                                  onChange={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    if (!isNaN(value)) {
+                                      setEditedTargets(prev => ({
+                                        ...prev,
+                                        [target.parameterId]: value
+                                      }));
+                                    }
+                                  }}
+                                  className="w-full"
+                                />
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground truncate">
+                                {target.updatedBy || '-'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        });
+                      })()}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {/* Pagination Controls */}
+                {targetsData.length > targetsPerPage && (
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {((currentTargetPage - 1) * targetsPerPage) + 1} to {Math.min(currentTargetPage * targetsPerPage, targetsData.length)} of {targetsData.length} parameters
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentTargetPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentTargetPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="text-sm">
+                        Page {currentTargetPage} of {Math.ceil(targetsData.length / targetsPerPage)}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentTargetPage(prev => Math.min(Math.ceil(targetsData.length / targetsPerPage), prev + 1))}
+                        disabled={currentTargetPage >= Math.ceil(targetsData.length / targetsPerPage)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
+                
+                <Button
+                  onClick={handleSaveTargets}
+                  disabled={isSavingTargets || Object.keys(editedTargets).length === 0}
+                >
+                  {isSavingTargets ? (
+                    <>
+                      <Activity className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsUpdateTargetsOpen(false);
+                    setEditedTargets({});
+                  }}
+                  disabled={isSavingTargets}
+                >
+                  <XIcon className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
+
+  // Fetch targets from backend
+  async function fetchTargets() {
+    setIsLoadingTargets(true);
+    setCurrentTargetPage(1); // Reset to first page
+    try {
+      const response = await getProcessParameterTargets();
+      if (response.success) {
+        setTargetsData(response.targets);
+        setEditedTargets({});
+      } else {
+        toast.error('Failed to load targets');
+      }
+    } catch (error) {
+      console.error('Error fetching targets:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to load targets'
+      );
+    } finally {
+      setIsLoadingTargets(false);
+    }
+  }
+
+  // Save updated targets to backend
+  async function handleSaveTargets() {
+    if (Object.keys(editedTargets).length === 0) {
+      toast.warning('No changes to save');
+      return;
+    }
+
+    setIsSavingTargets(true);
+    try {
+      const targetsToUpdate = Object.entries(editedTargets).map(([parameterId, targetValue]) => ({
+        parameterId,
+        targetValue
+      }));
+
+      const response = await updateProcessParameterTargets({ targets: targetsToUpdate });
+      
+      if (response.success) {
+        toast.success(
+          `Successfully updated ${response.updatedCount} target(s)`
+        );
+        setIsUpdateTargetsOpen(false);
+        setEditedTargets({});
+        
+        // Refresh the targets data
+        await fetchTargets();
+      } else {
+        toast.error('Failed to update targets');
+      }
+    } catch (error) {
+      console.error('Error updating targets:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to update targets'
+      );
+    } finally {
+      setIsSavingTargets(false);
+    }
+  }
 }

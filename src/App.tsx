@@ -9,7 +9,7 @@ import { SideDrawer } from './components/mining/SideDrawer';
 import { TimeRangeSelector } from './components/mining/TimeRangeSelector';
 import { KPICard } from './components/mining/KPICard';
 import { KPIHistoryDialog } from './components/mining/KPIHistoryDialog';
-import { AlertPanel } from './components/mining/AlertPanel';
+import { RecentNotificationsPanel } from './components/mining/RecentNotificationsPanel';
 import { EquipmentStatus } from './components/mining/EquipmentStatus';
 import { CriticalParameters } from './components/mining/CriticalParameters';
 import { BreakdownReporter } from './components/mining/BreakdownReporter';
@@ -19,6 +19,8 @@ import { ProcessParametersPanel } from './components/mining/ProcessParametersPan
 import { DataImportPanel } from './components/mining/DataImportPanel';
 import { AIChatPanel } from './components/mining/AIChatPanel';
 import { DataEntryPanelWithOneDrive } from './components/mining/DataEntryPanelWithOneDrive';
+import { NotificationProvider } from './context/NotificationContext';
+import { NotificationBell } from './components/mining/NotificationBell';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './components/ui/dialog';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
@@ -37,6 +39,9 @@ import {
   AlertTriangle,
   Plus
 } from 'lucide-react';
+
+// Import notification test utilities (available in console as window.notificationTest)
+import './utils/notificationTestUtils';
 
 // Initialize MSAL instance
 const msalInstance = new PublicClientApplication(msalConfig);
@@ -117,7 +122,7 @@ function AppContent() {
         
         // Set default tab based on role (matching Angular pattern)
         // Angular checks userRole from localStorage in constructor
-        if (user.role.toLowerCase() === 'admin') {
+        if (user.role.toLowerCase() === 'admin' || user.role.toLowerCase() === 'supervisor') {
           setActiveTab('dashboard');
         } else {
           setActiveTab('data-entry');
@@ -135,11 +140,11 @@ function AppContent() {
     localStorage.setItem('miningOpsRole', role);
     
     // Set default tab based on role (matching Angular routing pattern)
-    // Angular: admin -> /accounts, others -> /data-entry
-    if (role === 'admin') {
+    // Angular: admin/supervisor -> /accounts, operators -> /data-entry
+    if (role === 'admin' || role === 'supervisor') {
       setActiveTab('dashboard'); // React equivalent of /accounts
     } else {
-      setActiveTab('data-entry'); // Matches Angular pattern
+      setActiveTab('data-entry'); // Operators go to data entry
     }
   };
 
@@ -223,8 +228,8 @@ function AppContent() {
           />
         </div>
 
-        {/* Alert Panel */}
-        <AlertPanel alerts={alerts} />
+        {/* Recent Notifications Panel */}
+        <RecentNotificationsPanel />
       </div>
 
       {/* Critical Parameters */}
@@ -292,11 +297,14 @@ function AppContent() {
               Real-time monitoring, predictive maintenance, and process optimization
             </p>
           </div>
-          <div className="w-full lg:w-auto">
-            <TimeRangeSelector 
-              value={timeRange}
-              onChange={setTimeRange}
-            />
+          <div className="flex items-center gap-3 w-full lg:w-auto">
+            <div className="flex-1 lg:flex-initial">
+              <TimeRangeSelector 
+                value={timeRange}
+                onChange={setTimeRange}
+              />
+            </div>
+            <NotificationBell />
           </div>
         </div>
 
@@ -348,11 +356,13 @@ function AppContent() {
   );
 }
 
-// Wrap with MSAL Provider
+// Wrap with MSAL Provider and NotificationProvider
 export default function App() {
   return (
     <MsalProvider instance={msalInstance}>
-      <AppContent />
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </MsalProvider>
   );
 }

@@ -33,7 +33,7 @@ export function SideDrawer({ activeTab, onTabChange, open, onOpenChange, onLogou
       label: 'Dashboard',
       icon: <LayoutDashboard className="h-5 w-5" />,
       description: 'Overview and KPIs',
-      roles: ['admin', 'supervisor', 'operator'] as UserRole[]
+      roles: ['admin', 'supervisor'] as UserRole[]
     },
     {
       id: 'data-entry',
@@ -61,7 +61,7 @@ export function SideDrawer({ activeTab, onTabChange, open, onOpenChange, onLogou
       label: 'AI Assistant',
       icon: <MessageSquare className="h-5 w-5" />,
       description: 'Query insights and analysis',
-      roles: ['admin', 'supervisor', 'operator'] as UserRole[]
+      roles: ['admin', 'supervisor'] as UserRole[]
     }
   ];
 
