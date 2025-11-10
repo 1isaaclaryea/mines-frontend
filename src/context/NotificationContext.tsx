@@ -9,6 +9,7 @@ import {
   getNotifications,
   getUnacknowledgedCount,
   acknowledgeNotification as apiAcknowledgeNotification,
+  acknowledgeAllNotifications as apiAcknowledgeAllNotifications,
   deleteNotification as apiDeleteNotification,
   Notification,
   GetNotificationsParams,
@@ -27,6 +28,7 @@ interface NotificationContextType {
   totalCount: number;
   fetchNotifications: (params?: GetNotificationsParams) => Promise<void>;
   acknowledgeNotification: (id: string) => Promise<void>;
+  acknowledgeAllNotifications: () => Promise<void>;
   deleteNotification: (id: string) => Promise<void>;
   refreshUnacknowledgedCount: () => Promise<void>;
 }
@@ -107,6 +109,34 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       await refreshUnacknowledgedCount();
     }
   }, [fetchNotifications, refreshUnacknowledgedCount]);
+
+  /**
+   * Acknowledge all unacknowledged notifications
+   */
+  const acknowledgeAllNotifications = useCallback(async () => {
+    try {
+      // Optimistic update
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, acknowledged: true }))
+      );
+      const previousCount = unacknowledgedCount;
+      setUnacknowledgedCount(0);
+
+      await apiAcknowledgeAllNotifications();
+      toast.success('All notifications acknowledged');
+      
+      // Refresh to get updated data
+      await fetchNotifications();
+      await refreshUnacknowledgedCount();
+    } catch (error) {
+      console.error('Error acknowledging all notifications:', error);
+      toast.error('Failed to acknowledge all notifications');
+      
+      // Revert optimistic update
+      await fetchNotifications();
+      await refreshUnacknowledgedCount();
+    }
+  }, [unacknowledgedCount, fetchNotifications, refreshUnacknowledgedCount]);
 
   /**
    * Delete a notification (admin only)
@@ -299,6 +329,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     totalCount,
     fetchNotifications,
     acknowledgeNotification,
+    acknowledgeAllNotifications,
     deleteNotification,
     refreshUnacknowledgedCount,
   };

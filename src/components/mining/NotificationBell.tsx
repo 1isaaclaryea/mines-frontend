@@ -1,6 +1,6 @@
 /**
  * Notification Bell Component
- * Displays notification icon with badge count
+ * Displays notification icon with red dot indicator
  */
 
 import React, { useState } from 'react';
@@ -26,19 +26,18 @@ export const NotificationBell: React.FC = () => {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          aria-label={`Notifications (${unacknowledgedCount} unread)`}
-        >
-          <Bell className="h-5 w-5" />
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Notifications (${unacknowledgedCount} unread)`}
+          >
+            <Bell className="h-5 w-5" />
+          </Button>
           {unacknowledgedCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-              {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
-            </span>
+            <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-background" />
           )}
-        </Button>
+        </div>
       </PopoverTrigger>
       <PopoverContent 
         className="w-[400px] p-0" 

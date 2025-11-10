@@ -32,6 +32,7 @@ import {
   Legend,
   Brush
 } from 'recharts';
+import { Loader2 } from 'lucide-react';
 import { 
   getAnalogHistorianData, 
   getDigitalHistorianData,
@@ -812,6 +813,7 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   const [historianChartData, setHistorianChartData] = useState<any[]>([]);
   const [isLoadingChart, setIsLoadingChart] = useState(false);
   const [chartError, setChartError] = useState<string | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
   // Update Targets dialog state
   const [isUpdateTargetsOpen, setIsUpdateTargetsOpen] = useState(false);
@@ -842,12 +844,16 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   useEffect(() => {
     const fetchParameterValues = async () => {
       const currentSectionParams = SECTION_PARAMETERS[sectionKey] || SECTION_PARAMETERS['cil'];
-      if (!currentSectionParams || currentSectionParams.length === 0) return;
+      if (!currentSectionParams || currentSectionParams.length === 0) {
+        setIsInitialLoading(false);
+        return;
+      }
       
       // Check if user is authenticated before making API calls
       if (!isAuthenticated()) {
         console.warn('User not authenticated - skipping parameter values fetch');
         setParameters(currentSectionParams);
+        setIsInitialLoading(false);
         return;
       }
       
@@ -920,6 +926,8 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
         console.error('Error fetching parameter values:', error);
         // Set parameters with default values even on error
         setParameters(currentSectionParams);
+      } finally {
+        setIsInitialLoading(false);
       }
     };
 
@@ -1127,7 +1135,9 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   };
 
   return (
-    <div className="space-y-6">
+    <div className="relative">
+      {/* Content - Always rendered */}
+      <div className={`space-y-6 relative transition-all duration-300 ${isInitialLoading ? 'blur-md opacity-50' : ''}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex-1">
@@ -1640,6 +1650,28 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
           )}
         </DialogContent>
       </Dialog>
+      </div>
+
+      {/* Loading Overlay - On top of blurred content */}
+      {isInitialLoading && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center space-y-4 p-8 rounded-lg bg-card border shadow-2xl animate-in fade-in zoom-in duration-300 pointer-events-auto">
+            <div className="relative">
+              <Loader2 className="h-16 w-16 animate-spin text-primary" />
+              <div className="absolute inset-0 h-16 w-16 animate-ping rounded-full bg-primary/20" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold">Loading Process Parameters</h3>
+              <p className="text-sm text-muted-foreground">Fetching real-time data from historian...</p>
+            </div>
+            <div className="flex space-x-1">
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1650,7 +1682,12 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
     try {
       const response = await getProcessParameterTargets();
       if (response.success) {
-        setTargetsData(response.targets);
+        // Filter targets to only show parameters for the current section
+        const sectionParameterIds = sectionParams.map(p => p.id);
+        const filteredTargets = response.targets.filter(target => 
+          sectionParameterIds.includes(target.parameterId)
+        );
+        setTargetsData(filteredTargets);
         setEditedTargets({});
       } else {
         toast.error('Failed to load targets');

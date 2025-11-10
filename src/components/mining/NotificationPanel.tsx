@@ -9,7 +9,7 @@ import { NotificationItem } from './NotificationItem';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, CheckCheck } from 'lucide-react';
 import { GetNotificationsParams } from '../../services/notificationService';
 
 interface NotificationPanelProps {
@@ -24,6 +24,7 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose })
     currentPage,
     totalPages,
     fetchNotifications,
+    acknowledgeAllNotifications,
   } = useNotifications();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'unacknowledged' | 'acknowledged'>('all');
@@ -112,14 +113,27 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ onClose })
             {unacknowledgedCount} unacknowledged
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleRefresh}
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-2">
+          {unacknowledgedCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={acknowledgeAllNotifications}
+              disabled={loading}
+            >
+              <CheckCheck className="h-4 w-4 mr-2" />
+              Acknowledge All
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

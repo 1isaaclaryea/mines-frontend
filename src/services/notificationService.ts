@@ -159,6 +159,28 @@ export async function acknowledgeNotification(id: string): Promise<AcknowledgeRe
 }
 
 /**
+ * Acknowledge all unacknowledged notifications
+ */
+export async function acknowledgeAllNotifications(): Promise<AcknowledgeResponse> {
+  const response = await fetch(`${API_BASE_URL}/notifications/acknowledge-all`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    
+    if (response.status === 401) {
+      throw new Error('Authentication required');
+    }
+    
+    throw new Error(errorData.message || `Failed to acknowledge all notifications: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Delete a notification (admin only)
  */
 export async function deleteNotification(id: string): Promise<DeleteResponse> {
