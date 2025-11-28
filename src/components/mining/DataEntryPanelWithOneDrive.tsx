@@ -882,10 +882,10 @@ export function DataEntryPanelWithOneDrive({ userRole, employeeId, userName, onB
           color: #ffffff;
         }
         .Spreadsheet__cell.Spreadsheet__cell--selected {
-          background-color: #1a1a1a !important;
+          background-color: #000000 !important;
         }
         .Spreadsheet__cell.Spreadsheet__cell--selected input {
-          background-color: #1a1a1a !important;
+          background-color: #000000 !important;
           color: #ffffff !important;
         }
         .custom-spreadsheet {
@@ -932,13 +932,15 @@ export function DataEntryPanelWithOneDrive({ userRole, employeeId, userName, onB
           width: 100%;
           border: none;
           background: transparent;
-          color: #ffffff;
+          color: #ffffff !important;
           text-align: center;
           padding: 4px;
         }
         .custom-spreadsheet input:focus {
           outline: 2px solid hsl(var(--primary));
           outline-offset: -2px;
+          background-color: #000000 !important;
+          color: #ffffff !important;
         }
       `}</style>
     </div>

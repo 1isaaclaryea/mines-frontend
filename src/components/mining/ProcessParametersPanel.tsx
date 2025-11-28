@@ -65,6 +65,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
+import { CrusherModel3D } from '../ui/CrusherModel3D';
 
 interface Parameter {
   id: string;
@@ -91,6 +92,18 @@ interface Equipment {
   efficiency: number;
   lastMaintenance: string;
   nextMaintenance: string;
+}
+
+interface MonitoringLabel {
+  id: string;
+  name: string;
+  tag: string;
+  value: number;
+  unit: string;
+  status: 'optimal' | 'caution' | 'critical';
+  trend: 'up' | 'down' | 'stable';
+  lastUpdated: string;
+  description: string;
 }
 
 // Section-specific parameter mappings
@@ -800,6 +813,87 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
   ]
 };
 
+// Crusher monitoring labels data
+const CRUSHER_MONITORING_LABELS: MonitoringLabel[] = [
+  {
+    id: 'lube-level',
+    name: 'LUBE LEVEL',
+    tag: 'CRUSHER.LUBE_LEVEL.F_CV',
+    value: 0,
+    unit: '%',
+    status: 'optimal',
+    trend: 'stable',
+    lastUpdated: 'Loading...',
+    description: 'Lubrication system oil level'
+  },
+  {
+    id: 'flowmeter-a',
+    name: 'FLOWMETER A',
+    tag: 'CRUSHER.FLOWMETER_A.F_CV',
+    value: 0,
+    unit: 'L/min',
+    status: 'optimal',
+    trend: 'stable',
+    lastUpdated: 'Loading...',
+    description: 'Primary coolant flow rate'
+  },
+  {
+    id: 'flowmeter-b',
+    name: 'FLOWMETER B',
+    tag: 'CRUSHER.FLOWMETER_B.F_CV',
+    value: 0,
+    unit: 'L/min',
+    status: 'optimal',
+    trend: 'stable',
+    lastUpdated: 'Loading...',
+    description: 'Secondary coolant flow rate'
+  },
+  {
+    id: 'flowmeter-c',
+    name: 'FLOWMETER C',
+    tag: 'CRUSHER.FLOWMETER_C.F_CV',
+    value: 0,
+    unit: 'L/min',
+    status: 'optimal',
+    trend: 'stable',
+    lastUpdated: 'Loading...',
+    description: 'Hydraulic system flow rate'
+  },
+  {
+    id: 'flowmeter-d',
+    name: 'FLOWMETER D',
+    tag: 'CRUSHER.FLOWMETER_D.F_CV',
+    value: 0,
+    unit: 'L/min',
+    status: 'optimal',
+    trend: 'stable',
+    lastUpdated: 'Loading...',
+    description: 'Lubrication system flow rate'
+  },
+  {
+    id: 'flowmeter-e',
+    name: 'FLOWMETER E',
+    tag: 'CRUSHER.FLOWMETER_E.F_CV',
+    value: 0,
+    unit: 'L/min',
+    status: 'optimal',
+    trend: 'stable',
+    lastUpdated: 'Loading...',
+    description: 'Auxiliary system flow rate'
+  },
+  {
+    id: 'accumulator-pressure',
+    name: 'ACCUMULATOR PRESSURE',
+    tag: 'CRUSHER.ACCUMULATOR_PRESSURE.F_CV',
+    value: 0,
+    unit: 'bar',
+    status: 'optimal',
+    trend: 'stable',
+    lastUpdated: 'Loading...',
+    description: 'Hydraulic accumulator pressure'
+  }
+];
+
 interface ProcessParametersPanelProps {
   section?: string;
   onBack?: () => void;
@@ -814,6 +908,11 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   const [isLoadingChart, setIsLoadingChart] = useState(false);
   const [chartError, setChartError] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  
+  // Monitoring labels state
+  const [selectedMonitoringLabel, setSelectedMonitoringLabel] = useState<MonitoringLabel | null>(null);
+  const [isMonitoringDialogOpen, setIsMonitoringDialogOpen] = useState(false);
+  const [monitoringLabels, setMonitoringLabels] = useState<MonitoringLabel[]>(CRUSHER_MONITORING_LABELS);
   
   // Update Targets dialog state
   const [isUpdateTargetsOpen, setIsUpdateTargetsOpen] = useState(false);
@@ -1050,9 +1149,90 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
     fetchChartData();
   }, [selectedParameter, isDialogOpen]);
 
+  // Update monitoring labels with random values (only for crusher section)
+  useEffect(() => {
+    if (sectionKey !== 'crusher') return;
+
+    const updateMonitoringLabels = () => {
+      setMonitoringLabels(prevLabels => 
+        prevLabels.map(label => {
+          // Generate random values within realistic ranges
+          let newValue: number;
+          let status: 'optimal' | 'caution' | 'critical' = 'optimal';
+          
+          switch (label.id) {
+            case 'lube-level':
+              newValue = 75 + Math.random() * 20; // 75-95%
+              if (newValue < 80) status = 'critical';
+              else if (newValue < 85) status = 'caution';
+              break;
+            case 'flowmeter-a':
+              newValue = 45 + Math.random() * 15; // 45-60 L/min
+              if (newValue < 48) status = 'caution';
+              break;
+            case 'flowmeter-b':
+              newValue = 40 + Math.random() * 20; // 40-60 L/min
+              if (newValue < 45) status = 'caution';
+              break;
+            case 'flowmeter-c':
+              newValue = 35 + Math.random() * 25; // 35-60 L/min
+              if (newValue < 40) status = 'caution';
+              break;
+            case 'flowmeter-d':
+              newValue = 30 + Math.random() * 20; // 30-50 L/min
+              if (newValue < 35) status = 'caution';
+              break;
+            case 'flowmeter-e':
+              newValue = 25 + Math.random() * 15; // 25-40 L/min
+              if (newValue < 30) status = 'caution';
+              break;
+            case 'accumulator-pressure':
+              newValue = 150 + Math.random() * 50; // 150-200 bar
+              if (newValue < 160) status = 'critical';
+              else if (newValue < 170) status = 'caution';
+              break;
+            default:
+              newValue = Math.random() * 100;
+          }
+
+          // Determine trend
+          const trend = newValue > label.value ? 'up' : newValue < label.value ? 'down' : 'stable';
+          
+          const now = new Date();
+          const formattedTime = now.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          return {
+            ...label,
+            value: parseFloat(newValue.toFixed(2)),
+            status,
+            trend,
+            lastUpdated: formattedTime
+          };
+        })
+      );
+    };
+
+    // Initial update
+    updateMonitoringLabels();
+    
+    // Update every 3 seconds for dynamic effect
+    const interval = setInterval(updateMonitoringLabels, 3000);
+    return () => clearInterval(interval);
+  }, [sectionKey]);
+
   const handleParameterClick = (parameter: Parameter) => {
     setSelectedParameter(parameter);
     setIsDialogOpen(true);
+  };
+
+  const handleMonitoringLabelClick = (label: MonitoringLabel) => {
+    setSelectedMonitoringLabel(label);
+    setIsMonitoringDialogOpen(true);
   };
 
   const getStatusIcon = (status: string) => {
@@ -1222,6 +1402,64 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
           </CardContent>
         </Card>
       </div>
+
+      {/* Crusher Monitoring Section - Only show for crusher section */}
+      {sectionKey === 'crusher' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+              <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span>Crusher Monitoring</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Crusher 3D Model - Left Side */}
+              <div className="flex items-center justify-center">
+                <CrusherModel3D 
+                  className="w-full h-full rounded-lg shadow-lg"
+                  autoRotate={true}
+                  rotationSpeed={0.003}
+                  enableControls={true}
+                />
+              </div>
+              
+              {/* Monitoring Labels - Right Side */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold mb-4">Live Monitoring Parameters</h3>
+                {monitoringLabels.map((label) => (
+                  <div
+                    key={label.id}
+                    className={`p-3 rounded-lg border-l-4 ${getStatusColor(label.status)} cursor-pointer hover:bg-accent/50 transition-colors`}
+                    onClick={() => handleMonitoringLabelClick(label)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h4 className="font-medium text-sm">{label.name}</h4>
+                          <div className="flex items-center space-x-1">
+                            {getStatusIcon(label.status)}
+                            {getTrendIcon(label.trend)}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-lg font-bold">
+                            {label.value}{label.unit}
+                          </p>
+                          <p className="text-xs text-muted-foreground flex items-center space-x-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{label.lastUpdated}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Critical Process Parameters */}
@@ -1502,6 +1740,127 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Last Updated:</span>
                   <span className="font-medium">{selectedParameter.lastUpdated}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Monitoring Label Trend Dialog */}
+      <Dialog open={isMonitoringDialogOpen} onOpenChange={setIsMonitoringDialogOpen}>
+        <DialogContent className="max-w-[98vw] w-full max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader className="pr-8">
+            <DialogTitle className="flex items-center space-x-2 text-sm sm:text-base">
+              <Settings className="h-4 w-4" />
+              <span className="truncate">{selectedMonitoringLabel?.name}</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              {selectedMonitoringLabel?.description}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedMonitoringLabel && (
+            <div className="space-y-3 mt-2">
+              {/* Trend Chart with Mock Data */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm sm:text-base font-semibold">Today's Trend (00:00 - Now)</h3>
+                  <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500">
+                    Live Data
+                  </Badge>
+                </div>
+                
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart
+                    data={generateHistoricalData({
+                      ...selectedMonitoringLabel,
+                      target: selectedMonitoringLabel.value * 0.9 // Use current value as baseline
+                    } as Parameter)}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="time" 
+                      className="text-xs"
+                      tick={{ fill: 'currentColor' }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis 
+                      className="text-xs"
+                      tick={{ fill: 'currentColor' }}
+                      label={{ 
+                        value: selectedMonitoringLabel.unit, 
+                        angle: -90, 
+                        position: 'insideLeft',
+                        style: { textAnchor: 'middle' }
+                      }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px'
+                      }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="value" 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      name="Actual Value"
+                      dot={{ fill: '#10b981', r: 2 }}
+                      activeDot={{ r: 5 }}
+                    />
+                    <Brush 
+                      dataKey="time" 
+                      height={30} 
+                      stroke="#8884d8"
+                      fill="hsl(var(--muted))"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <Separator />
+
+              {/* Current Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Current Value</p>
+                  <p className="text-base sm:text-lg font-bold">
+                    {selectedMonitoringLabel.value}{selectedMonitoringLabel.unit}
+                  </p>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <div className="flex items-center space-x-1.5">
+                    {getStatusIcon(selectedMonitoringLabel.status)}
+                    <span className="text-xs sm:text-sm font-semibold capitalize">
+                      {selectedMonitoringLabel.status}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Trend</p>
+                  <div className="flex items-center space-x-1.5">
+                    {getTrendIcon(selectedMonitoringLabel.trend)}
+                    <span className="text-xs sm:text-sm font-semibold capitalize">
+                      {selectedMonitoringLabel.trend}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              <div className="bg-muted/50 p-2 sm:p-3 rounded-lg">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Last Updated:</span>
+                  <span className="font-medium">{selectedMonitoringLabel.lastUpdated}</span>
                 </div>
               </div>
             </div>

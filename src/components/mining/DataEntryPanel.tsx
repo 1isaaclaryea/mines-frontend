@@ -528,12 +528,15 @@ export function DataEntryPanel({ userRole }: DataEntryPanelProps) {
           width: 100%;
           border: none;
           background: transparent;
+          color: hsl(var(--foreground)) !important;
           text-align: center;
           padding: 4px;
         }
         .custom-spreadsheet input:focus {
           outline: 2px solid hsl(var(--primary));
           outline-offset: -2px;
+          background-color: hsl(var(--background)) !important;
+          color: hsl(var(--foreground)) !important;
         }
       `}</style>
     </div>
