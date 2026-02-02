@@ -62,7 +62,7 @@ export function KPIHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-card border-border">
+      <DialogContent className="max-w-2xl bg-card border-border overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2 text-xl">
             {icon && <div className="text-muted-foreground">{icon}</div>}
@@ -72,7 +72,7 @@ export function KPIHistoryDialog({
             Historical data for recent hours
           </DialogDescription>
         </DialogHeader>
-        
+
         {/* Entry Count Control */}
         <div className="flex items-center justify-between py-2 border-b border-border">
           <span className="text-sm text-muted-foreground">Number of entries:</span>
@@ -107,7 +107,7 @@ export function KPIHistoryDialog({
         </div>
 
         {/* Scrollable History Container */}
-        <div className="space-y-3 overflow-y-auto max-h-[400px] pr-2">
+        <div className="space-y-3 overflow-y-auto h-[300px] pr-2">
           {displayedHistory.map((entry, index) => (
             <div
               key={index}

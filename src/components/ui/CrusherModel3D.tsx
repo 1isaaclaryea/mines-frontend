@@ -51,31 +51,28 @@ function CanvasAttribution() {
       style={{
         pointerEvents: 'auto',
         userSelect: 'text',
-        width: '400px',
-        minWidth: '300px'
+        width: '300px',
+        minWidth: '200px'
       }}
     >
-      <div className="text-gray-500 text-[8px] leading-tight w-full bg-black/10 p-2 rounded" style={{ width: '100%', minWidth: '300px' }}>
-        <p className="mb-0.5">
-          <a 
-            href="https://skfb.ly/pxqxY" 
-            target="_blank" 
+      <div style={{ width: '100%', minWidth: '200px', fontSize: '12px', color: 'rgba(80, 80, 80, 0.5)', lineHeight: 1.2 }}>
+        <p>
+          <a
+            href="https://skfb.ly/pxqxY"
+            target="_blank"
             rel="noopener noreferrer"
-            className="text-gray-400 hover:text-gray-200 underline"
+            style={{ color: 'rgba(100, 100, 100, 0.4)', textDecoration: 'underline' }}
           >
-            "Gyratory Crusher by hak.35158"
+            Gyratory Crusher by hak.35158
           </a>
-          {" "}
-        </p>
-        <p className="text-[8px]">
-          {" "}
-          <a 
-            href="http://creativecommons.org/licenses/by/4.0/" 
-            target="_blank" 
+          {" · "}
+          <a
+            href="http://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
             rel="noopener noreferrer"
-            className="text-gray-400 hover:text-gray-200 underline"
+            style={{ color: 'rgba(100, 100, 100, 0.4)', textDecoration: 'underline' }}
           >
-            Licensed under CC Attribution
+            CC BY
           </a>
         </p>
       </div>
@@ -90,18 +87,18 @@ interface CrusherModel3DProps {
   enableControls?: boolean;
 }
 
-export function CrusherModel3D({ 
-  className = "w-full h-[600px]", 
-  autoRotate = true, 
+export function CrusherModel3D({
+  className = "w-full h-[600px] sm:h-[600px] lg:h-[700px]",
+  autoRotate = true,
   rotationSpeed = 0.005,
-  enableControls = true 
+  enableControls = true
 }: CrusherModel3DProps) {
   return (
     <div className={`${className} relative`}>
       <Canvas
         camera={{ 
-          position: [5, 5, 5], 
-          fov: 50,
+          position: [3, 3, 3], 
+          fov: 60,
           near: 0.1,
           far: 1000 
         }}
@@ -137,8 +134,8 @@ export function CrusherModel3D({
               enablePan={false}
               enableZoom={true}
               enableRotate={false}
-              minDistance={2}
-              maxDistance={20}
+              minDistance={1.5}
+              maxDistance={15}
             />
           )}
           

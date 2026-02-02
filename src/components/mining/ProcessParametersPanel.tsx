@@ -708,7 +708,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
   'flotation': [
     {
       id: 'flotation-cell-1',
-      name: 'Flotation Cell Motor 1',
+      name: 'Flotation Cell 1',
       tag: 'FLOTATION.CELL_1.F_CV',
       type: 'pump',
       status: 'offline',
@@ -721,7 +721,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
     },
     {
       id: 'flotation-cell-2',
-      name: 'Flotation Cell Motor 2',
+      name: 'Flotation Cell 2',
       tag: 'FLOTATION.CELL_2.F_CV',
       type: 'pump',
       status: 'offline',
@@ -734,7 +734,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
     },
     {
       id: 'flotation-cell-3',
-      name: 'Flotation Cell Motor 3',
+      name: 'Flotation Cell 3',
       tag: 'FLOTATION.CELL_3.F_CV',
       type: 'pump',
       status: 'offline',
@@ -747,7 +747,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
     },
     {
       id: 'flotation-cell-4',
-      name: 'Flotation Cell Motor 4',
+      name: 'Flotation Cell 4',
       tag: 'FLOTATION.CELL_4.F_CV',
       type: 'pump',
       status: 'offline',
@@ -760,7 +760,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
     },
     {
       id: 'flotation-cell-5',
-      name: 'Flotation Cell Motor 5',
+      name: 'Flotation Cell 5',
       tag: 'FLOTATION.CELL_5.F_CV',
       type: 'pump',
       status: 'offline',
@@ -773,7 +773,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
     },
     {
       id: 'flotation-cell-6',
-      name: 'Flotation Cell Motor 6',
+      name: 'Flotation Cell 6',
       tag: 'FLOTATION.CELL_6.F_CV',
       type: 'pump',
       status: 'offline',
@@ -786,7 +786,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
     },
     {
       id: 'flotation-cell-7',
-      name: 'Flotation Cell Motor 7',
+      name: 'Flotation Cell 7',
       tag: 'FLOTATION.CELL_7.F_CV',
       type: 'pump',
       status: 'offline',
@@ -799,7 +799,7 @@ const SECTION_EQUIPMENT: Record<string, Equipment[]> = {
     },
     {
       id: 'flotation-tailings-motor',
-      name: 'Flotation Tailings Motor',
+      name: 'Flotation Tailings',
       tag: 'FLOTATION.TAILINGS_MOTOR.F_CV',
       type: 'pump',
       status: 'offline',
@@ -1414,8 +1414,8 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Crusher 3D Model - Left Side */}
-              <div className="flex items-center justify-center">
+              {/* Crusher 3D Model - Left Side (hidden on mobile) */}
+              <div className="max-lg:hidden flex items-center justify-center min-h-[320px]">
                 <CrusherModel3D 
                   className="w-full h-full rounded-lg shadow-lg"
                   autoRotate={true}
@@ -1532,7 +1532,7 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
             <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
               <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
                 <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span>Critical Equipment</span>
+                <span>Critical Equipment Status</span>
               </CardTitle>
               <div className="flex flex-wrap gap-1 sm:gap-2">
                 {(['all', 'critical', 'caution', 'optimal'] as const).map((filter) => (

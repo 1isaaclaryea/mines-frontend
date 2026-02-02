@@ -1,9 +1,17 @@
+import { useState } from "react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "../ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import {
   LineChart,
   Line,
@@ -15,25 +23,26 @@ import {
   ReferenceLine,
 } from "recharts";
 import { TrendingUp } from "lucide-react";
+import { chartDataOptions } from "./mockData";
 
-interface ProductionData {
-  time: string;
-  throughput: number;
-  target: number;
-  efficiency: number;
-}
+type ChartOptionKey = keyof typeof chartDataOptions;
 
 interface ProductionChartProps {
-  data: ProductionData[];
-  title: string;
   className?: string;
 }
 
-export function ProductionChart({
-  data,
-  title,
-  className,
-}: ProductionChartProps) {
+export function ProductionChart({ className }: ProductionChartProps) {
+  const [selectedChart, setSelectedChart] = useState<ChartOptionKey>("throughput");
+
+  const currentOption = chartDataOptions[selectedChart];
+
+  // Calculate Y-axis domain with upper bound above target for label visibility
+  const targetValue = currentOption.data[0]?.target ?? 0;
+  const allValues = currentOption.data.flatMap(d => [d.actual, d.target]);
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues, targetValue + 2);
+  const yAxisDomain: [number, number] = [Math.floor(minValue * 0.95), Math.ceil(maxValue)];
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
@@ -45,7 +54,7 @@ export function ProductionChart({
               className="text-sm"
               style={{ color: entry.color }}
             >
-              {`${entry.dataKey}: ${entry.value}${entry.dataKey === "efficiency" ? "%" : " tons/hr"}`}
+              {`${entry.dataKey === 'actual' ? currentOption.actualLabel : currentOption.targetLabel}: ${entry.value} ${currentOption.unit}`}
             </p>
           ))}
         </div>
@@ -57,15 +66,32 @@ export function ProductionChart({
   return (
     <Card className={`bg-card border-border ${className}`}>
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <TrendingUp className="h-5 w-5 text-blue-400" />
-          <span>{title}</span>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5 text-blue-400" />
+            <span>Performance Chart</span>
+          </CardTitle>
+          <Select
+            value={selectedChart}
+            onValueChange={(value: ChartOptionKey) => setSelectedChart(value)}
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select parameter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="throughput">Throughput vs Target</SelectItem>
+              <SelectItem value="elution">Elution vs Target</SelectItem>
+              <SelectItem value="goldRecovery">Gold Recovery vs Target</SelectItem>
+              <SelectItem value="carbonInPulp">Carbon in Pulp vs Target</SelectItem>
+              <SelectItem value="efficiency">Efficiency vs Target</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
+            <LineChart data={currentOption.data}>
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="#374151"
@@ -78,55 +104,38 @@ export function ProductionChart({
               <YAxis
                 stroke="#9ca3af"
                 fontSize={12}
+                domain={yAxisDomain}
                 label={{
-                  value: "Throughput (tons/hr)",
+                  value: `${currentOption.actualLabel} (${currentOption.unit})`,
                   angle: -90,
                   position: "insideLeft",
-                  style: { fontSize: 10 },
-                }}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                stroke="#9ca3af"
-                fontSize={12}
-                label={{
-                  value: "Efficiency (%)",
-                  angle: 90,
-                  position: "insideRight",
-                  style: { fontSize: 10 },
+                  style: { fontSize: 10, fill: "#9ca3af" },
                 }}
               />
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine
-                y={100}
-                stroke="#f59e0b"
+                y={currentOption.data[0]?.target}
+                stroke={currentOption.targetColor}
                 strokeDasharray="2 2"
-                label={{ value: "Target", position: "left" }}
+                label={{ value: "Target", position: "left", fill: currentOption.targetColor }}
               />
               <Line
                 type="monotone"
-                dataKey="throughput"
-                stroke="#3b82f6"
+                dataKey="actual"
+                stroke={currentOption.actualColor}
                 strokeWidth={2}
-                dot={{ fill: "#3b82f6", strokeWidth: 2, r: 4 }}
+                dot={{ fill: currentOption.actualColor, strokeWidth: 2, r: 4 }}
                 activeDot={{ r: 6 }}
+                name={currentOption.actualLabel}
               />
               <Line
                 type="monotone"
                 dataKey="target"
-                stroke="#f59e0b"
+                stroke={currentOption.targetColor}
                 strokeWidth={1}
                 strokeDasharray="5 5"
                 dot={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="efficiency"
-                stroke="#10b981"
-                strokeWidth={2}
-                dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
-                yAxisId="right"
+                name={currentOption.targetLabel}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -134,21 +143,21 @@ export function ProductionChart({
         <div className="flex items-center justify-between mt-4 text-sm">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: currentOption.actualColor }}
+              ></div>
               <span className="text-muted-foreground">
-                Throughput
+                {currentOption.actualLabel}
               </span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <div
+                className="w-3 h-1"
+                style={{ backgroundColor: currentOption.targetColor }}
+              ></div>
               <span className="text-muted-foreground">
-                Efficiency
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-1 bg-yellow-500"></div>
-              <span className="text-muted-foreground">
-                Target
+                {currentOption.targetLabel}
               </span>
             </div>
           </div>

@@ -2,9 +2,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescri
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { Badge } from "../ui/badge";
-import { 
+import { useState, useEffect } from 'react';
+import {
   LayoutDashboard,
-  FileText, 
+  FileText,
   Settings,
   Upload,
   MessageSquare,
@@ -13,7 +14,9 @@ import {
   User,
   UserCog,
   HardHat,
-  Edit3
+  Edit3,
+  Clock,
+  AlertCircle
 } from "lucide-react";
 import { UserRole } from "./LoginPage";
 
@@ -27,12 +30,32 @@ interface SideDrawerProps {
 }
 
 export function SideDrawer({ activeTab, onTabChange, open, onOpenChange, onLogout, userRole = 'admin' }: SideDrawerProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   const baseNavigationItems = [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: <LayoutDashboard className="h-5 w-5" />,
       description: 'Overview and KPIs',
+      roles: ['admin', 'supervisor'] as UserRole[]
+    },
+    {
+      id: 'critical-status',
+      label: 'Critical Equipment Status',
+      icon: <AlertCircle className="h-5 w-5" />,
+      description: 'Equipment requiring attention',
       roles: ['admin', 'supervisor'] as UserRole[]
     },
     {
@@ -56,11 +79,18 @@ export function SideDrawer({ activeTab, onTabChange, open, onOpenChange, onLogou
       description: 'Historian data upload',
       roles: ['admin'] as UserRole[]
     },
+    // {
+    //   id: 'ai-chat',
+    //   label: 'AI Assistant',
+    //   icon: <MessageSquare className="h-5 w-5" />,
+    //   description: 'Query insights and analysis',
+    //   roles: ['admin', 'supervisor'] as UserRole[]
+    // },
     {
-      id: 'ai-chat',
-      label: 'AI Assistant',
-      icon: <MessageSquare className="h-5 w-5" />,
-      description: 'Query insights and analysis',
+      id: 'downtimes',
+      label: 'Downtimes',
+      icon: <Clock className="h-5 w-5" />,
+      description: 'Equipment downtime tracking',
       roles: ['admin', 'supervisor'] as UserRole[]
     }
   ];
@@ -99,18 +129,20 @@ export function SideDrawer({ activeTab, onTabChange, open, onOpenChange, onLogou
         <Button 
           variant="outline" 
           size="sm" 
-          className="fixed top-4 left-4 z-50 bg-card border-border shadow-lg sm:bg-card/90 sm:backdrop-blur-sm"
+          className="fixed left-4 z-50 bg-card border-border shadow-lg bg-card/90 backdrop-blur-sm"
+          style={{ top: isMobile ? '44px' : '16px' }}
         >
           <Menu className="h-4 w-4" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-80 sm:w-96 bg-sidebar border-sidebar-border">
+      <SheetContent side="left" className="w-80 sm:w-96 bg-sidebar border-sidebar-border p-0">
         <SheetHeader className="sr-only">
           <SheetTitle>Navigation Menu</SheetTitle>
           <SheetDescription>
-            Main navigation for the Mining Operations Analytics Platform
+            Main navigation for Larnis Insights
           </SheetDescription>
         </SheetHeader>
+        <div className="h-full overflow-y-auto overflow-x-hidden p-6">
         <div className="p-4 bg-sidebar-accent rounded-lg mb-6 space-y-3">
           <div className="flex items-center space-x-3">
             <div className="bg-sidebar-primary rounded-full p-2">
@@ -189,6 +221,7 @@ export function SideDrawer({ activeTab, onTabChange, open, onOpenChange, onLogou
               </div>
             </div>
           </div>
+        </div>
         </div>
       </SheetContent>
     </Sheet>

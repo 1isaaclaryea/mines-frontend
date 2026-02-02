@@ -16,6 +16,7 @@ import {
 } from '../services/notificationService';
 import { toast } from 'sonner';
 import { getUserRole } from '../services/apiService';
+import { pushNotificationService } from '../services/pushNotificationService';
 
 interface NotificationContextType {
   notifications: Notification[];
@@ -166,7 +167,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   /**
    * Handle equipment alert from Socket.IO
    */
-  const handleEquipmentAlert = useCallback((alert: EquipmentAlert) => {
+  const handleEquipmentAlert = useCallback(async (alert: EquipmentAlert) => {
     console.log('Equipment alert received:', alert);
 
     // Add to notifications list
@@ -187,6 +188,26 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     // Increment unacknowledged count
     if (!alert.acknowledged) {
       setUnacknowledgedCount((prev) => prev + 1);
+    }
+
+    // Send push notification for critical alerts
+    if (alert.status === 'down' || alert.severity === 'critical') {
+      try {
+        await pushNotificationService.sendLocalNotification({
+          title: `🔴 ${alert.equipmentName} - ${alert.status.toUpperCase()}`,
+          body: alert.message,
+          data: {
+            type: 'equipment_alert',
+            equipmentId: alert.tag,
+            equipmentName: alert.equipmentName,
+            status: alert.status,
+            severity: alert.severity,
+            route: '#/equipment'
+          }
+        });
+      } catch (error) {
+        console.warn('Failed to send push notification:', error);
+      }
     }
 
     // Show toast notification

@@ -92,9 +92,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Shield className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">Mining Operations</h1>
+          <div className="flex items-center justify-center mb-4">
+            <img 
+              src="/images/LOGO_INSIGHT.png" 
+              alt="Larnis Insight" 
+              style={{ height: '12rem', width: 'auto', marginBottom: '-2rem', marginTop: '-2rem' }}
+            />
           </div>
           <p className="text-muted-foreground">
             Secure access to analytics platform
@@ -234,7 +237,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground space-y-1">
-          <p>Mining Operations Analytics Platform v2.1</p>
+          <p>Larnis Insights v2.1</p>
           <p>Secure • Real-time • Predictive</p>
         </div>
       </div>
