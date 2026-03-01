@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -917,11 +917,19 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
   // Update Targets dialog state
   const [isUpdateTargetsOpen, setIsUpdateTargetsOpen] = useState(false);
   const [targetsData, setTargetsData] = useState<ProcessParameterTarget[]>([]);
-  const [editedTargets, setEditedTargets] = useState<Record<string, number>>({});
+  const [editedTargets, setEditedTargets] = useState<Record<string, string>>({});
   const [isLoadingTargets, setIsLoadingTargets] = useState(false);
   const [isSavingTargets, setIsSavingTargets] = useState(false);
   const [currentTargetPage, setCurrentTargetPage] = useState(1);
   const targetsPerPage = 5;
+  const targetsMapRef = useRef<Record<string, number>>({});
+
+  // Keep targetsMapRef in sync with targetsData for use in interval callbacks
+  useEffect(() => {
+    targetsMapRef.current = Object.fromEntries(
+      targetsData.map(t => [t.parameterId, t.targetValue])
+    );
+  }, [targetsData]);
 
   // Get section-specific parameters and equipment
   const sectionKey = section || 'cil'; // Default to CIL if no section specified
@@ -938,6 +946,13 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
     setParameters(newParams);
     setEquipment(newEquipment);
   }, [section, sectionKey]);
+
+  // Fetch API targets on mount and whenever the section changes
+  useEffect(() => {
+    if (isAuthenticated()) {
+      fetchTargets();
+    }
+  }, [sectionKey]);
 
   // Fetch latest analog values for parameters (current values)
   useEffect(() => {
@@ -982,7 +997,7 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
             if (tagData.length > 0) {
               const latest = tagData[0];
               const value = latest.value;
-              const target = param.target;
+              const target = targetsMapRef.current[param.id] ?? param.target;
               const deviation = Math.abs(value - target) / target;
               
               let status: 'optimal' | 'caution' | 'critical';
@@ -1005,6 +1020,7 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
               
               return {
                 ...param,
+                target,
                 value: parseFloat(value.toFixed(2)),
                 status,
                 trend,
@@ -1923,13 +1939,10 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
                                   step="0.01"
                                   value={currentValue}
                                   onChange={(e) => {
-                                    const value = parseFloat(e.target.value);
-                                    if (!isNaN(value)) {
-                                      setEditedTargets(prev => ({
-                                        ...prev,
-                                        [target.parameterId]: value
-                                      }));
-                                    }
+                                    setEditedTargets(prev => ({
+                                      ...prev,
+                                      [target.parameterId]: e.target.value
+                                    }));
                                   }}
                                   className="w-full"
                                 />
@@ -2048,6 +2061,12 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
         );
         setTargetsData(filteredTargets);
         setEditedTargets({});
+        setParameters(prev =>
+          prev.map(param => {
+            const apiTarget = filteredTargets.find(t => t.parameterId === param.id);
+            return apiTarget ? { ...param, target: apiTarget.targetValue } : param;
+          })
+        );
       } else {
         toast.error('Failed to load targets');
       }
@@ -2070,10 +2089,12 @@ export function ProcessParametersPanel({ section, onBack }: ProcessParametersPan
 
     setIsSavingTargets(true);
     try {
-      const targetsToUpdate = Object.entries(editedTargets).map(([parameterId, targetValue]) => ({
-        parameterId,
-        targetValue
-      }));
+      const targetsToUpdate = Object.entries(editedTargets)
+        .filter(([, raw]) => raw !== '' && !isNaN(parseFloat(raw)))
+        .map(([parameterId, raw]) => ({
+          parameterId,
+          targetValue: parseFloat(raw)
+        }));
 
       const response = await updateProcessParameterTargets({ targets: targetsToUpdate });
       
